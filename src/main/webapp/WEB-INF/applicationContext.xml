@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xsi:schemaLocation="http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd">
+
+<!--配置Annotation操作支持-->
+    <context:annotation-config/>
+    <!--注解包扫描路径-->
+    <context:component-scan base-package="cn.mldn"/>
+    <!--资源文件加载-->
+    <context:property-placeholder location="classpath:database.properties"/>
+    <mvc:annotation-driven/>
+    <!--表示配置默认的servlet处理程序-->
+    <mvc:default-servlet-handler/>
+
+    <!-- 配置数据库连接池 -->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="${db.driver}"/>    <!-- 驱动程序 -->
+        <property name="jdbcUrl" value="${db.url}"/><!-- 连接地址 -->
+        <property name="user" value="${db.user}"/>    <!-- 用户名 -->
+        <property name="password" value="${db.password}"/>    <!-- 密码 -->
+        <property name="maxPoolSize" value="${pool.max}"/>    <!-- 最大的可用连接数 -->
+        <property name="minPoolSize" value="${pool.min}"/>    <!-- 最小维持的连接数 -->
+        <property name="initialPoolSize" value="${pool.init}"/>    <!-- 初始化连接数 -->
+        <property name="maxIdleTime" value="${pool.idle}"/>    <!-- 最大等待连接 -->
+    </bean>
+
+    <!-- 如果需要对事务进行控制，可以直接在数据源上进行操作 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!--将SqlSessionFactory交由spring管理-->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="configLocation" value="classpath:mybatis-config.xml"/>
+    </bean>
+
+    <!--表示事务采用Annotation的方式进行-->
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+    <!-- 定义通知，配置事务出现的环境，与业务层的方法有关 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!-- 定义一切与服务层有关的控制方法名称，只要是使用了特定的名称那么就会自动处理事务 -->
+        <tx:attributes>
+            <tx:method name="insert*" propagation="REQUIRED"/>
+            <tx:method name="update*" propagation="REQUIRED"/>
+            <tx:method name="delete*" propagation="REQUIRED"/>
+            <tx:method name="query*" propagation="REQUIRED" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+    <!-- 定义事务的处理切入点 -->
+    <aop:config expose-proxy="true">
+        <!--在业务层中进行切入控制-->
+        <aop:pointcut id="pointcut" expression="execution(* cn.mldn.service.*.*(..))"/>
+        <!--所有的通知控制，交由“事务的通知处理完成”-->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="pointcut"/>
+    </aop:config>
+</beans>
